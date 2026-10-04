@@ -1,0 +1,55 @@
+- id: release_change
+  code: Q1
+  question: "What changed in the latest checkout release?"
+  expected_sources:
+    - jira
+    - vercel
+    - git
+  requires_historical_memory: false
+
+- id: release_production_impact
+  code: Q2
+  question: "Did that release cause a production issue?"
+  expected_sources:
+    - vercel
+    - sentry
+    - posthog
+  requires_historical_memory: false
+
+- id: incident_root_cause
+  code: Q3
+  question: "What caused the issue?"
+  expected_sources:
+    - jira
+    - vercel
+    - sentry
+    - git
+  requires_historical_memory: false
+
+- id: historical_incident
+  code: Q4
+  question: "Have we experienced something similar before?"
+  expected_sources:
+    - sentry
+    - jira
+  requires_historical_memory: true
+
+- id: previous_fix
+  code: Q5
+  question: "How did we fix it last time?"
+  expected_sources:
+    - jira
+    - sentry
+    - git
+  requires_historical_memory: true
+
+- id: preventive_guidance
+  code: Q6
+  question: "What should an engineer know before making another caching change?"
+  expected_sources:
+    - jira
+    - vercel
+    - sentry
+    - posthog
+    - git
+  requires_historical_memory: true

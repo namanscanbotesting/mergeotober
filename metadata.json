@@ -1,0 +1,8 @@
+{
+  "name": "MergeStream",
+  "description": "Accelerate your hackathon development by automating project setup and knowledge management using the Cognee intelligence engine.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
