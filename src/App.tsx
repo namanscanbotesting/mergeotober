@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   GOLDEN_QUESTIONS,
   GoldenQuestion,
@@ -13,7 +13,20 @@ import { KnowledgeGraphCanvas } from './components/KnowledgeGraphCanvas';
 import { ConnectorExplorer } from './components/ConnectorExplorer';
 import { SyncLifecycleLab } from './components/SyncLifecycleLab';
 import { MergetoberPackView } from './components/MergetoberPackView';
-import { ArrowRight, ExternalLink, MessageSquare, Play, Search, Sparkles } from 'lucide-react';
+import {
+  ArrowRight,
+  Check,
+  Copy,
+  ExternalLink,
+  Info,
+  MessageSquare,
+  Play,
+  Plus,
+  Search,
+  Settings,
+  ShieldCheck,
+  X
+} from 'lucide-react';
 
 type ActiveTab = 'chat' | 'query' | 'graph' | 'connectors' | 'sync' | 'mergetober';
 
@@ -27,13 +40,25 @@ export default function App() {
   const [isDraftRecordDeletedUpstream, setIsDraftRecordDeletedUpstream] = useState<boolean>(false);
   const [syncGeneration, setSyncGeneration] = useState<number>(1);
   const [pipelineStatusMessage, setPipelineStatusMessage] = useState<string | null>(null);
+  const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
+  const [showAddCustomRecordModal, setShowAddCustomRecordModal] = useState<boolean>(false);
 
+  // Dynamic custom user-injected records
+  const [customRecords, setCustomRecords] = useState<SourceRecord[]>([]);
+  const [newRecordSystem, setNewRecordSystem] = useState<SourceSystem>('jira');
+  const [newRecordId, setNewRecordId] = useState<string>('');
+  const [newRecordTitle, setNewRecordTitle] = useState<string>('');
+  const [newRecordContent, setNewRecordContent] = useState<string>('');
+
+  const [copiedEnv, setCopiedEnv] = useState<boolean>(false);
+
+  // Base list of records
   const activeRecords: SourceRecord[] = useMemo(() => {
-    if (isDraftRecordDeletedUpstream) {
-      return INITIAL_SOURCE_RECORDS.filter((r) => r.id !== 'PAY-195');
-    }
-    return INITIAL_SOURCE_RECORDS;
-  }, [isDraftRecordDeletedUpstream]);
+    let list = isDraftRecordDeletedUpstream
+      ? INITIAL_SOURCE_RECORDS.filter((r) => r.id !== 'PAY-195')
+      : INITIAL_SOURCE_RECORDS;
+    return [...list, ...customRecords];
+  }, [isDraftRecordDeletedUpstream, customRecords]);
 
   const filteredTimelineRecords = useMemo(() => {
     if (systemFilter === 'all') return activeRecords;
@@ -102,9 +127,77 @@ export default function App() {
     }, 4500);
   };
 
+  const handleAddCustomRecord = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRecordId.trim() || !newRecordTitle.trim()) return;
+
+    const customRec: SourceRecord = {
+      id: newRecordId.trim(),
+      source_system: newRecordSystem,
+      source_type: newRecordSystem === 'jira' ? 'issue' : newRecordSystem === 'vercel' ? 'deployment' : 'error',
+      source_id: newRecordId.trim(),
+      source_url: `https://app.${newRecordSystem}.com/${newRecordId.trim()}`,
+      project: 'checkout-custom',
+      timestamp: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      author: 'You',
+      title: newRecordTitle.trim(),
+      status: 'Active',
+      document_source_attr: 'rendered_document',
+      document_content: newRecordContent.trim() || `${newRecordId}: ${newRecordTitle}`,
+      write_disposition: 'replace',
+      cursor_field: 'updated_at',
+      cursor_value: new Date().toISOString(),
+      related_ids: []
+    };
+
+    setCustomRecords((prev) => [...prev, customRec]);
+    setSelectedRecordId(customRec.id);
+    setShowAddCustomRecordModal(false);
+    setNewRecordId('');
+    setNewRecordTitle('');
+    setNewRecordContent('');
+  };
+
+  const handleCopyEnvExample = () => {
+    const envText = `# Cognee Cloud / Dedicated Tenant API Connection
+COGNEE_API_BASE_URL="https://tenant-615ef6f1-7b2d-4bbc-9135-d5ad2168f920.aws.cognee.ai"
+COGNEE_TENANT_ID="615ef6f1-7b2d-4bbc-9135-d5ad2168f920"
+COGNEE_API_KEY="namandemo"
+
+# LLM & Inference Engine
+LLM_API_KEY="namandemo"
+LLM_BASE_URL="https://generativelanguage.googleapis.com/v1beta"
+LLM_MODEL="gemini-2.5-flash"
+EMBEDDING_PROVIDER="gliner"
+DEMO_MODE="true"
+
+# PostHog Integration Details
+POSTHOG_PROJECT_TOKEN="phc_qqfsGHhnaman"
+POSTHOG_PROJECT_ID="644866"
+POSTHOG_HOST="https://us.i.posthog.com"
+POSTHOG_REGION="US Cloud"
+POSTHOG_PERSONAL_API_KEY=""
+
+# Sentry Integration Details
+SENTRY_AUTH_TOKEN="sntryu_6e0ea94a617ebebfe7c38bfa4naman"
+SENTRY_ORG_SLUG="naman-52"
+
+# Jira & Vercel Connectors
+JIRA_SUBDOMAIN="acme-payments"
+JIRA_EMAIL="eng@acme.dev"
+JIRA_API_TOKEN=""
+VERCEL_API_TOKEN=""
+VERCEL_TEAM_ID="team_checkout_core"`;
+
+    navigator.clipboard.writeText(envText);
+    setCopiedEnv(true);
+    setTimeout(() => setCopiedEnv(false), 2000);
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-[#0B0F17] text-slate-100">
-      {/* 3-Zone Top Bar Contract with LIVE CHAT Tab */}
+      {/* 3-Zone Header Contract */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#0B0F17] sticky top-0 z-30">
         <a
           href="#top"
@@ -182,14 +275,22 @@ export default function App() {
           </button>
         </nav>
 
-        {/* Primary Action Button */}
-        <div className="flex items-center gap-3">
+        {/* Primary Actions: Settings & Pipeline */}
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setShowConfigModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 rounded transition-colors whitespace-nowrap"
+            title="Configure Base URL, Model Name, and inspect Demo Data requirements"
+          >
+            <Settings className="w-3.5 h-3.5 text-amber-400" />
+            <span>.env &amp; Data Mode</span>
+          </button>
           <button
             onClick={handleRunCogneePipeline}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold bg-amber-500 text-slate-950 rounded hover:bg-amber-400 transition-colors whitespace-nowrap"
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold bg-amber-500 text-slate-950 rounded hover:bg-amber-400 transition-colors whitespace-nowrap"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
-            Run Cognee Pipeline
+            Run Pipeline
           </button>
         </div>
       </header>
@@ -198,7 +299,7 @@ export default function App() {
       <div className="flex md:hidden items-center gap-2 overflow-x-auto px-4 py-2.5 border-b border-slate-800 bg-[#0F1522]">
         {(
           [
-            ['chat', 'Live Chat (Option A)'],
+            ['chat', 'Live Chat'],
             ['query', 'Memory Query'],
             ['graph', 'Knowledge Graph'],
             ['connectors', 'DLT Connectors'],
@@ -250,44 +351,43 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-6 text-xs font-mono tabular-nums text-slate-300 shrink-0">
-                <div>
-                  <div className="text-slate-400">DLT Connectors</div>
-                  <div className="text-base font-semibold text-slate-100 mt-0.5">
-                    4 Active (Jira · Vercel · Sentry · PostHog)
-                  </div>
+              {/* Data Mode & Environment Quick Bar */}
+              <div className="bg-slate-950 border border-slate-800 p-3.5 rounded text-xs font-mono space-y-1.5 shrink-0">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-slate-400">Data Mode:</span>
+                  <span className="text-emerald-400 font-semibold">Demo Data (Zero Keys Needed)</span>
                 </div>
-                <div className="h-8 w-px bg-slate-800 hidden sm:block" />
-                <div>
-                  <div className="text-slate-400">Ingested Records</div>
-                  <div className="text-base font-semibold text-slate-100 mt-0.5">
-                    {activeRecords.length} Entities
-                  </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-slate-400">LLM Model:</span>
+                  <span className="text-amber-300">gemini-2.5-flash</span>
                 </div>
-                <div className="h-8 w-px bg-slate-800 hidden sm:block" />
-                <div>
-                  <div className="text-slate-400">Historical Span</div>
-                  <div className="text-base font-semibold text-amber-400 mt-0.5">
-                    Mar 2026 → Oct 2026
-                  </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-slate-400">Base URL:</span>
+                  <span className="text-slate-300">Google AI / Generative Language</span>
                 </div>
+                <button
+                  onClick={() => setShowConfigModal(true)}
+                  className="w-full mt-1 pt-1.5 border-t border-slate-800 text-[11px] text-amber-400 hover:text-amber-300 text-center"
+                >
+                  Configure Base URL &amp; View Requirements →
+                </button>
               </div>
             </div>
 
-            {/* Quick Chat Shortcut banner */}
+            {/* Quick Live Chat Mode Banner */}
             <div className="bg-amber-500/10 border border-amber-500/40 p-4 rounded flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <MessageSquare className="w-5 h-5 text-amber-400 shrink-0" />
                 <div>
                   <span className="text-xs font-mono text-amber-300 font-semibold uppercase">Option A Live Conversational Chat:</span>
-                  <p className="text-xs text-slate-200 mt-0.5">You can chat interactively with the memory graph in real time.</p>
+                  <p className="text-xs text-slate-200 mt-0.5">Chat in real time with conversational memory across all 12 source records.</p>
                 </div>
               </div>
               <button
                 onClick={() => setActiveTab('chat')}
                 className="px-3.5 py-1.5 text-xs font-semibold bg-amber-500 text-slate-950 rounded hover:bg-amber-400 transition-colors whitespace-nowrap self-start sm:self-center"
               >
-                Switch to Live Chat Tab →
+                Open Live Chat Tab →
               </button>
             </div>
 
@@ -336,25 +436,38 @@ export default function App() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* Left Column (3 cols): Source Timeline */}
               <div className="lg:col-span-3 border border-slate-800 bg-[#0F1522] p-4 space-y-4">
-                <div className="border-b border-slate-800 pb-3">
-                  <h2 className="text-sm font-semibold text-slate-100">
-                    Ingested Source Timeline
-                  </h2>
-                  <div className="flex flex-wrap gap-1 mt-3 p-1 bg-slate-950 border border-slate-800 rounded">
-                    {(['all', 'jira', 'vercel', 'sentry', 'posthog', 'git'] as const).map((sys) => (
-                      <button
-                        key={sys}
-                        onClick={() => setSystemFilter(sys)}
-                        className={`px-2 py-1 text-[11px] font-mono rounded transition-colors whitespace-nowrap ${
-                          systemFilter === sys
-                            ? 'bg-amber-500 text-slate-950 font-semibold'
-                            : 'text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        {sys.toUpperCase()}
-                      </button>
-                    ))}
+                <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-100">
+                      Ingested Source Timeline
+                    </h2>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {activeRecords.length} records in memory
+                    </p>
                   </div>
+                  <button
+                    onClick={() => setShowAddCustomRecordModal(true)}
+                    className="p-1.5 bg-slate-900 border border-slate-800 hover:border-amber-500 text-amber-400 rounded transition-colors"
+                    title="Add custom engineering record to graph"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-1 p-1 bg-slate-950 border border-slate-800 rounded">
+                  {(['all', 'jira', 'vercel', 'sentry', 'posthog', 'git'] as const).map((sys) => (
+                    <button
+                      key={sys}
+                      onClick={() => setSystemFilter(sys)}
+                      className={`px-2 py-1 text-[11px] font-mono rounded transition-colors whitespace-nowrap ${
+                        systemFilter === sys
+                          ? 'bg-amber-500 text-slate-950 font-semibold'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {sys.toUpperCase()}
+                    </button>
+                  ))}
                 </div>
 
                 <div className="divide-y divide-slate-800/80 max-h-[560px] overflow-y-auto pr-1">
@@ -536,9 +649,218 @@ export default function App() {
         )}
       </main>
 
+      {/* ================= MODAL: .ENV CONFIG & DEMO DATA REQUIREMENTS ================= */}
+      {showConfigModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#0F1522] border border-slate-800 rounded-lg max-w-2xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-amber-400" />
+                  .env Configuration &amp; Data Requirements
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  How Base URL, Model Name, API Key, and Demo Data are handled.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowConfigModal(false)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Section 1: Active Configuration */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-mono text-amber-400 uppercase">
+                1. Connected Cognee Tenant &amp; Integrations
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
+                <div className="p-3 bg-slate-950 border border-slate-800">
+                  <span className="text-slate-400 block">Cognee Dedicated Tenant:</span>
+                  <span className="text-emerald-400 mt-1 block break-all font-semibold">
+                    tenant-615ef6f1-7b2d-4bbc-9135-d5ad2168f920.aws.cognee.ai
+                  </span>
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Tenant ID: 615ef6f1-7b2d-4bbc-9135-d5ad2168f920 · Key: namandemo
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-950 border border-slate-800">
+                  <span className="text-slate-400 block">PostHog Project (US Cloud):</span>
+                  <span className="text-amber-300 mt-1 block font-semibold">
+                    Project ID: 644866
+                  </span>
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Token: phc_qqfsGHhnaman · Host: us.i.posthog.com
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-950 border border-slate-800">
+                  <span className="text-slate-400 block">Sentry Production Org:</span>
+                  <span className="text-rose-300 mt-1 block font-semibold">
+                    Org Slug: naman-52
+                  </span>
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Auth Token: sntryu_6e0ea...naman (Active)
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-950 border border-slate-800">
+                  <span className="text-slate-400 block">LLM Reasoning Engine:</span>
+                  <span className="text-emerald-400 mt-1 block font-semibold">
+                    gemini-2.5-flash
+                  </span>
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Base: generativelanguage.googleapis.com
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 2: What is Required? */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-mono text-amber-400 uppercase">
+                2. What is Required? (Demo Data vs. Live Data)
+              </h4>
+              <div className="space-y-3">
+                <div className="p-4 bg-emerald-950/20 border border-emerald-800/40 rounded">
+                  <div className="text-xs font-mono text-emerald-400 font-semibold">
+                    MODE A: RUNNING WITH DEMO DATA (CURRENT DEFAULT)
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                    <strong>What is required?</strong> <span className="text-emerald-300 font-medium">Nothing!</span> You do not need any API keys, tokens, or Atlassian/Vercel/Sentry/PostHog accounts. The app comes pre-packaged with 12 real engineering records, 6 golden incident questions, and 7-month historical precedent.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-slate-950 border border-slate-800 rounded">
+                  <div className="text-xs font-mono text-slate-300 font-semibold">
+                    MODE B: RUNNING WITH LIVE CONNECTORS (REAL TOOLS)
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    To ingest live data from your real engineering stack, configure these in <code className="text-slate-200">.env</code>:
+                  </p>
+                  <ul className="text-xs text-slate-300 space-y-1.5 mt-2 font-mono list-disc pl-4">
+                    <li><strong className="text-slate-200">LLM_API_KEY:</strong> For entity extraction &amp; answers.</li>
+                    <li><strong className="text-sky-300">Jira:</strong> JIRA_SUBDOMAIN, JIRA_EMAIL, JIRA_API_TOKEN.</li>
+                    <li><strong className="text-purple-300">Vercel:</strong> VERCEL_API_TOKEN, VERCEL_TEAM_ID.</li>
+                    <li><strong className="text-rose-300">Sentry:</strong> SENTRY_AUTH_TOKEN, SENTRY_ORG_SLUG.</li>
+                    <li><strong className="text-amber-300">PostHog:</strong> POSTHOG_PERSONAL_API_KEY, POSTHOG_PROJECT_ID.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 3: Copy full .env template */}
+            <div className="pt-2 flex items-center justify-between border-t border-slate-800">
+              <span className="text-xs text-slate-400">
+                Need the exact .env template?
+              </span>
+              <button
+                onClick={handleCopyEnvExample}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono bg-slate-800 hover:bg-slate-700 text-slate-200 rounded transition-colors"
+              >
+                {copiedEnv ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedEnv ? 'Copied .env' : 'Copy Full .env Template'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: ADD CUSTOM RECORD ================= */}
+      {showAddCustomRecordModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-[#0F1522] border border-slate-800 rounded-lg max-w-lg w-full p-6 space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-semibold text-slate-100">
+                Add Custom Engineering Record to Cognee Graph
+              </h3>
+              <button
+                onClick={() => setShowAddCustomRecordModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddCustomRecord} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-400 mb-1 font-mono">Source System</label>
+                <select
+                  value={newRecordSystem}
+                  onChange={(e) => setNewRecordSystem(e.target.value as SourceSystem)}
+                  className="w-full bg-slate-950 border border-slate-800 p-2 text-slate-100 rounded focus:border-amber-500"
+                >
+                  <option value="jira">Jira Issue</option>
+                  <option value="git">Git Commit</option>
+                  <option value="vercel">Vercel Deployment</option>
+                  <option value="sentry">Sentry Error</option>
+                  <option value="posthog">PostHog Feature Flag</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-mono">Record ID (e.g. AUTH-201, dep-992)</label>
+                <input
+                  type="text"
+                  required
+                  value={newRecordId}
+                  onChange={(e) => setNewRecordId(e.target.value)}
+                  placeholder="e.g. AUTH-201"
+                  className="w-full bg-slate-950 border border-slate-800 p-2 text-slate-100 rounded focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-mono">Title / Summary</label>
+                <input
+                  type="text"
+                  required
+                  value={newRecordTitle}
+                  onChange={(e) => setNewRecordTitle(e.target.value)}
+                  placeholder="e.g. Invalidate OAuth session on logout"
+                  className="w-full bg-slate-950 border border-slate-800 p-2 text-slate-100 rounded focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-mono">Document Content (DOCUMENT_SOURCE_ATTR)</label>
+                <textarea
+                  rows={4}
+                  value={newRecordContent}
+                  onChange={(e) => setNewRecordContent(e.target.value)}
+                  placeholder="Description, comments, or stack trace details..."
+                  className="w-full bg-slate-950 border border-slate-800 p-2 text-slate-100 rounded focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddCustomRecordModal(false)}
+                  className="px-3 py-1.5 text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-amber-500 text-slate-950 font-semibold rounded hover:bg-amber-400"
+                >
+                  Inject into Cognee Graph
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
       <footer className="border-t border-slate-800 px-6 py-4 mt-12 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-4">
         <div>DevMemory — Cognee Engineering Memory Engine</div>
-        <div className="font-mono">Option A CLI: python demo/chat_cli.py</div>
+        <div className="font-mono text-[11px] text-slate-400 flex items-center gap-3">
+          <span>Model: <code className="text-amber-300">gemini-2.5-flash</code></span>
+          <span aria-hidden="true">·</span>
+          <span>Option A CLI: <code className="text-emerald-400">python demo/chat_cli.py</code></span>
+        </div>
       </footer>
     </div>
   );

@@ -167,19 +167,21 @@ export const LiveChatView: React.FC<LiveChatViewProps> = ({ onSelectRecord }) =>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column (8 cols): Interactive Chat Window */}
         <div className="lg:col-span-8 flex flex-col border border-slate-800 bg-[#0F1522] h-[660px]">
-          {/* Chat Header */}
-          <div className="px-5 py-3 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
+          {/* Chat Header with active .env model and data mode */}
+          <div className="px-5 py-3 border-b border-slate-800 bg-slate-950/60 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Bot className="w-4 h-4 text-amber-400" />
               <span className="text-xs font-mono font-medium text-slate-200">
                 Cognee Memory Agent
               </span>
-              <span className="text-[11px] font-mono text-emerald-400">
-                ● Graph Online (12 Records)
+              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 border border-emerald-800/60 rounded">
+                Demo Data Mode (Zero Keys Needed)
               </span>
             </div>
-            <div className="text-[11px] font-mono text-slate-400">
-              Model: cognee.search()
+            <div className="flex items-center gap-3 text-[11px] font-mono text-slate-400">
+              <span>Model: <code className="text-amber-300">gemini-2.5-flash</code></span>
+              <span aria-hidden="true">·</span>
+              <span>Base: <code className="text-slate-300">generativelanguage.googleapis.com</code></span>
             </div>
           </div>
 

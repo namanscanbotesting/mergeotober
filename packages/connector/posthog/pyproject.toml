@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cognee-community-connector-posthog"
+version = "0.1.0"
+description = "Cognee declarative DLT connector for PostHog feature flags and conversion insights"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "cognee>=0.1.20",
+    "dlt>=0.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
